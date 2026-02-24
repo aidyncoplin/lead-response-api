@@ -4,6 +4,8 @@ from dotenv import load_dotenv
 from openai import OpenAI
 from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel
+import smtplib
+from email.message import EmailMessage
 
 load_dotenv()
 
@@ -23,7 +25,23 @@ class Lead(BaseModel):
     name: str
     service: str
     interest: str
+    notify_email: str
 
+def send_email(to_email: str, subject: str, body: str) -> None:
+    email_from = os.getenv("EMAIL_FROM")
+    app_pw = os.getenv("EMAIL_APP_PASSWORD")
+    if not email_from or not app_pw:
+        raise RuntimeError("EMAIL_FROM or EMAIL_APP_PASSWORD not set")
+
+    msg = EmailMessage()
+    msg["From"] = email_from
+    msg["To"] = to_email
+    msg["Subject"] = subject
+    msg.set_content(body)
+
+    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as smtp:
+        smtp.login(email_from, app_pw)
+        smtp.send_message(msg)
 
 def generate_followup(name: str, service: str, interest: str) -> str:
     resp = client.chat.completions.create(
@@ -57,4 +75,12 @@ def generate_lead_response(lead: Lead, x_api_key: str = Header(default="", alias
 
     msg = generate_followup(lead.name, lead.service, lead.interest)
     save_to_csv(lead.name, lead.service, lead.interest, msg)
+
+    # SEND EMAIL HERE
+    send_email(
+        to_email=lead.notify_email,
+        subject=f"New lead follow-up generated for {lead.name}",
+        body=msg,
+    )
+
     return {"reply": msg}
