@@ -77,10 +77,14 @@ def generate_lead_response(lead: Lead, x_api_key: str = Header(default="", alias
     save_to_csv(lead.name, lead.service, lead.interest, msg)
 
     # SEND EMAIL HERE
+try:
     send_email(
         to_email=lead.notify_email,
         subject=f"New lead follow-up generated for {lead.name}",
         body=msg,
     )
+except Exception as e:
+    # Don't crash the whole API; return a useful error
+    raise HTTPException(status_code=500, detail=f"Email send failed: {type(e).__name__}")
 
     return {"reply": msg}
