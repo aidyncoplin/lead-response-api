@@ -2,17 +2,20 @@ import os
 import csv
 from dotenv import load_dotenv
 from openai import OpenAI
-from fastapi import FastAPI
+from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel
 
 load_dotenv()
 
-key = os.getenv("OPENAI_API_KEY")
-if not key:
-    raise RuntimeError("OPENAI_API_KEY not found. Check your .env file.")
+OPENAI_KEY = os.getenv("OPENAI_API_KEY")
+API_SECRET = os.getenv("API_SECRET")
 
-client = OpenAI(api_key=key)
+if not OPENAI_KEY:
+    raise RuntimeError("OPENAI_API_KEY not set")
+if not API_SECRET:
+    raise RuntimeError("API_SECRET not set")
 
+client = OpenAI(api_key=OPENAI_KEY)
 app = FastAPI(title="Lead Response API")
 
 
@@ -48,7 +51,10 @@ def root():
 
 
 @app.post("/generate-lead-response")
-def generate_lead_response(lead: Lead):
+def generate_lead_response(lead: Lead, x_api_key: str = Header(default="", alias="X-API-KEY")):
+    if x_api_key != API_SECRET:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
     msg = generate_followup(lead.name, lead.service, lead.interest)
     save_to_csv(lead.name, lead.service, lead.interest, msg)
     return {"reply": msg}
