@@ -137,7 +137,23 @@ def is_valid_email(email: str) -> bool:
 def root():
     return {"status": "ok", "message": "Lead Response API is running"}
 
+@app.get("/demo")
+def demo():
+    # Fake lead data for demos
+    name = "Mike"
+    service = "Roofing estimate"
+    interest = "Storm damage"
 
+    seq = generate_followup_sequence(name, service, interest)
+
+    # Also show what would be sent immediately
+    return {
+        "demo": True,
+        "lead": {"name": name, "service": service, "interest": interest},
+        "sequence": seq,
+        "immediate_sms_preview": seq["msg_0"],
+    }
+    
 @app.post("/generate-lead-response")
 def generate_lead_response(
     lead: Lead,
@@ -162,7 +178,7 @@ def generate_lead_response(
 
     if not is_valid_e164(lead.lead_phone):
         raise HTTPException(status_code=422, detail="lead_phone must be in E.164 format like +18015551234")
-        
+
     # 1) Generate AI message
     seq = generate_followup_sequence(lead.name, lead.service, lead.interest)
     msg = seq["msg_0"]
