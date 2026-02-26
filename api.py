@@ -1,6 +1,8 @@
 import os
 import csv
 import json
+import uuid
+import datetime
 import smtplib
 from email.message import EmailMessage
 
@@ -139,6 +141,9 @@ def generate_lead_response(
     if x_api_key != api_secret:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
+    request_id = str(uuid.uuid4())
+    timestamp = datetime.datetime.utcnow().isoformat()
+    
     # 1) Generate AI message
     seq = generate_followup_sequence(lead.name, lead.service, lead.interest)
     msg = seq["msg_0"]
@@ -176,8 +181,11 @@ def generate_lead_response(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"SMS send failed: {type(e).__name__}: {e}")
         
+    print(f"[{timestamp}] Request {request_id} | Lead: {lead.name} | SMS_MODE: {sms_mode}")
 
     return {
+        "request_id": request_id,
+        "timestamp_utc": timestamp,
         "sequence": seq,
         "emailed_to": lead.notify_email,
         "sms_sent_to": sms_to,
