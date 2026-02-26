@@ -39,7 +39,7 @@ def generate_followup(name: str, service: str, interest: str) -> str:
         messages=[
             {
                 "role": "system",
-                "content": "You are a professional sales assistant. Write a short, friendly SMS under 67 characters. Include the customer's name. Be conversational, not corporate. End with a question that encourages a reply."
+                "content": "You are a professional sales assistant. Write a short, friendly SMS under 180 characters. Include the customer's name. Be conversational, not corporate. End with a question that encourages a reply."
             },
             {
                 "role": "user",
@@ -100,7 +100,7 @@ def generate_followup_sequence(name: str, service: str, interest: str):
         messages=[
             {
                 "role": "system",
-                "content": "Create 3 SMS follow-up messages for a lead. Message 1: immediate. Message 2: 24-hour reminder. Message 3: final nudge. Keep each under 67 characters. Friendly tone."
+                "content": "Create 3 SMS follow-up messages for a lead. Message 1: immediate. Message 2: 24-hour reminder. Message 3: final nudge. Keep each under 180 characters. Friendly tone."
             },
             {
                 "role": "user",
