@@ -167,6 +167,6 @@ def generate_lead_response(
 
     return {
         "reply": msg,
-        "emailed_to": lead.notify_email,
-        "sms_sent_to": test_to,
+        "sms_sent_to": sms_to,
+        "sms_mode": sms_mode,
     }
