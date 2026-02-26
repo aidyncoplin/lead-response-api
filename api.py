@@ -1,5 +1,6 @@
 import os
 import csv
+import json
 import smtplib
 from email.message import EmailMessage
 
@@ -94,21 +95,27 @@ def send_sms(to_number: str, body: str) -> None:
         from_=from_number,
         body=body,
     )
-def generate_followup_sequence(name: str, service: str, interest: str):
+def generate_followup_sequence(name: str, service: str, interest: str) -> dict:
     resp = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[
             {
                 "role": "system",
-                "content": "Create 3 SMS follow-up messages for a lead. Message 1: immediate. Message 2: 24-hour reminder. Message 3: final nudge. Keep each under 180 characters. Friendly tone."
+                "content": (
+                    "Return ONLY valid JSON (no markdown, no extra text) with keys: "
+                    "msg_0, msg_24h, msg_72h. Each value is an SMS under 120 characters. "
+                    "Friendly, casual, includes the customer's name, ends with a question."
+                ),
             },
             {
                 "role": "user",
-                "content": f"Name: {name}\nService: {service}\nInterest: {interest}"
+                "content": f"Name: {name}\nService: {service}\nInterest: {interest}",
             },
         ],
     )
-    return resp.choices[0].message.content
+
+    text = resp.choices[0].message.content.strip()
+    return json.loads(text)
 
 # -------------------------
 # Routes
@@ -133,7 +140,8 @@ def generate_lead_response(
         raise HTTPException(status_code=401, detail="Unauthorized")
 
     # 1) Generate AI message
-    msg = generate_followup_sequence(lead.name, lead.service, lead.interest)
+    seq = generate_followup_sequence(lead.name, lead.service, lead.interest)
+    msg = seq["msg_0"]
 
     # 2) Save it
     save_to_csv(lead.name, lead.service, lead.interest, msg)
@@ -143,7 +151,11 @@ def generate_lead_response(
         send_email(
             to_email=lead.notify_email,
             subject=f"New lead follow-up generated for {lead.name}",
-            body=msg,
+            body=(
+            f"Immediate:\n{seq['msg_0']}\n\n"
+            f"+24h:\n{seq['msg_24h']}\n\n"
+            f"+72h:\n{seq['msg_72h']}\n"
+        ),
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Email send failed: {type(e).__name__}: {e}")
@@ -166,7 +178,8 @@ def generate_lead_response(
         
 
     return {
-        "reply": msg,
+        "sequence": seq,
+        "emailed_to": lead.notify_email,
         "sms_sent_to": sms_to,
         "sms_mode": sms_mode,
     }
