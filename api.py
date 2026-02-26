@@ -2,7 +2,7 @@ import os
 import csv
 import smtplib
 from email.message import EmailMessage
-
+from twilio.rest import Client as TwilioClient
 from dotenv import load_dotenv
 from openai import OpenAI
 from fastapi import FastAPI, Header, HTTPException
@@ -20,7 +20,7 @@ class Lead(BaseModel):
     service: str
     interest: str
     notify_email: str
-
+    lead_phone: str
 
 def generate_followup(name: str, service: str, interest: str) -> str:
     resp = client.chat.completions.create(
@@ -58,6 +58,20 @@ def send_email(to_email: str, subject: str, body: str) -> None:
         smtp.login(email_from, app_pw)
         smtp.send_message(msg)
 
+def send_sms(to_number: str, body: str) -> None:
+    sid = os.getenv("TWILIO_ACCOUNT_SID")
+    token = os.getenv("TWILIO_AUTH_TOKEN")
+    from_number = os.getenv("TWILIO_FROM_NUMBER")
+
+    if not sid or not token or not from_number:
+        raise RuntimeError("Missing Twilio env vars")
+
+    tw = TwilioClient(sid, token)
+    tw.messages.create(
+        to=to_number,
+        from_=from_number,
+        body=body,
+    )
 
 @app.get("/")
 def root():
@@ -89,3 +103,13 @@ def generate_lead_response(
         raise HTTPException(status_code=500, detail=f"Email send failed: {type(e).__name__}: {e}")
 
     return {"reply": msg}
+   
+    # For now, send to your own verified number
+test_to = os.getenv("TEST_SMS_TO")
+if not test_to:
+    raise HTTPException(status_code=500, detail="Server misconfigured: TEST_SMS_TO missing")
+
+try:
+    send_sms(test_to, msg)
+except Exception as e:
+    raise HTTPException(status_code=500, detail=f"SMS send failed: {type(e).__name__}: {e}")
