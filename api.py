@@ -39,7 +39,7 @@ def generate_followup(name: str, service: str, interest: str) -> str:
         messages=[
             {
                 "role": "system",
-                "content": "You write short, professional follow-up messages for small businesses.",
+                "content": "Y"You are a professional sales assistant. Write a short, friendly SMS under 320 characters. Include the customer’s name. Be conversational, not corporate. End with a question that encourages a reply."",
             },
             {
                 "role": "user",
@@ -94,7 +94,21 @@ def send_sms(to_number: str, body: str) -> None:
         from_=from_number,
         body=body,
     )
-
+def generate_followup_sequence(name: str, service: str, interest: str):
+    resp = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {
+                "role": "system",
+                "content": "Create 3 SMS follow-up messages for a lead. Message 1: immediate. Message 2: 24-hour reminder. Message 3: final nudge. Keep each under 320 characters. Friendly tone."
+            },
+            {
+                "role": "user",
+                "content": f"Name: {name}\nService: {service}\nInterest: {interest}"
+            },
+        ],
+    )
+    return resp.choices[0].message.content
 
 # -------------------------
 # Routes
@@ -141,7 +155,7 @@ def generate_lead_response(
         raise HTTPException(status_code=500, detail="Server misconfigured: TEST_SMS_TO missing")
 
     try:
-        send_sms(test_to, msg)
+        send_sms(lead.lead_phone, msg)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"SMS send failed: {type(e).__name__}: {e}")
 
