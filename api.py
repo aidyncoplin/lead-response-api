@@ -133,7 +133,7 @@ def generate_lead_response(
         raise HTTPException(status_code=401, detail="Unauthorized")
 
     # 1) Generate AI message
-    msg = generate_followup(lead.name, lead.service, lead.interest)
+    msg = generate_followup_sequence(lead.name, lead.service, lead.interest)
 
     # 2) Save it
     save_to_csv(lead.name, lead.service, lead.interest, msg)
