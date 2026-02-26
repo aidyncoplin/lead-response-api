@@ -2,6 +2,7 @@ import os
 import csv
 import json
 import uuid
+import re
 import datetime
 import smtplib
 from email.message import EmailMessage
@@ -119,6 +120,15 @@ def generate_followup_sequence(name: str, service: str, interest: str) -> dict:
     text = resp.choices[0].message.content.strip()
     return json.loads(text)
 
+def is_valid_e164(phone: str) -> bool:
+    # E.164 format: + followed by 10–15 digits
+    return bool(re.fullmatch(r"\+\d{10,15}", phone or ""))
+
+
+def is_valid_email(email: str) -> bool:
+    # Simple sanity check (not perfect, but good enough)
+    return bool(re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email or ""))
+
 # -------------------------
 # Routes
 # -------------------------
@@ -143,7 +153,16 @@ def generate_lead_response(
 
     request_id = str(uuid.uuid4())
     timestamp = datetime.datetime.utcnow().isoformat()
-    
+
+    if not lead.name.strip() or not lead.service.strip() or not lead.interest.strip():
+        raise HTTPException(status_code=422, detail="name/service/interest cannot be empty")
+
+    if not is_valid_email(lead.notify_email):
+        raise HTTPException(status_code=422, detail="notify_email is invalid")
+
+    if not is_valid_e164(lead.lead_phone):
+        raise HTTPException(status_code=422, detail="lead_phone must be in E.164 format like +18015551234")
+        
     # 1) Generate AI message
     seq = generate_followup_sequence(lead.name, lead.service, lead.interest)
     msg = seq["msg_0"]
