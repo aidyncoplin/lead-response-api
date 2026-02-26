@@ -148,22 +148,22 @@ def generate_lead_response(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Email send failed: {type(e).__name__}: {e}")
 
-    # SMS (TEST MODE)
-    test_to = os.getenv("TEST_SMS_TO")
+    # SMS MODE: "test" sends to TEST_SMS_TO, "live" sends to the lead's phone
+    sms_mode = (os.getenv("SMS_MODE") or "test").lower()
 
-    if not test_to:
-        raise HTTPException(
-            status_code=500,
-            detail="Server misconfigured: TEST_SMS_TO missing"
-        )
+    if sms_mode == "live":
+        sms_to = lead.lead_phone
+    else:
+        sms_to = os.getenv("TEST_SMS_TO")
+
+    if not sms_to:
+        raise HTTPException(status_code=500, detail="SMS target missing (check SMS_MODE/TEST_SMS_TO/lead_phone)")
 
     try:
-        send_sms(test_to, msg)
+        send_sms(sms_to, msg)
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"SMS send failed: {type(e).__name__}: {e}"
-        )
+        raise HTTPException(status_code=500, detail=f"SMS send failed: {type(e).__name__}: {e}")
+        
 
     return {
         "reply": msg,
