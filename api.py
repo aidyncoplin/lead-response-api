@@ -39,7 +39,7 @@ def generate_followup(name: str, service: str, interest: str) -> str:
         messages=[
             {
                 "role": "system",
-                "content": "Y"You are a professional sales assistant. Write a short, friendly SMS under 320 characters. Include the customer’s name. Be conversational, not corporate. End with a question that encourages a reply."
+                "content": "You are a professional sales assistant. Write a short, friendly SMS under 320 characters. Include the customer's name. Be conversational, not corporate. End with a question that encourages a reply."
             },
             {
                 "role": "user",
