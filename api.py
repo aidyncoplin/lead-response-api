@@ -95,18 +95,13 @@ def generate_followup_sequence(name: str, service: str, interest: str) -> dict:
         "Keys: msg_0, msg_24h, msg_72h. "
         "Each value must be under 120 characters. "
         "Tone: experienced local storm roofing contractor texting a homeowner. "
-        "Sound calm, confident, and helpful. "
-        "Mention inspection or insurance when relevant. "
-        "Create urgency subtly (adjusters booking up, damage worsens). "
-        "Always end with a simple question to encourage reply. "
-        "No emojis. No marketing language. No corporate tone. "
-        "Sound human and specific."
+        "Calm, confident, helpful, not salesy. No emojis, no exclamation points. "
+        "Do NOT use marketing lines like 'time's ticking' or 'peace of mind'. "
+        "Do NOT say 'free' unless explicitly told. "
+        "Offer a roof inspection/roof check and insurance help when relevant. "
+        "End with an easy-to-answer question (two options like 'morning or afternoon?')."
     ),
 },
-            {
-                "role": "user",
-                "content": f"Name: {name}\nService: {service}\nInterest: {interest}",
-            },
         ],
     )
 
