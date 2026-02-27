@@ -103,30 +103,29 @@ def generate_followup_sequence(name: str, service: str, interest: str) -> dict:
         ],
     )
 
-text = resp.choices[0].message.content.strip()
+    text = resp.choices[0].message.content.strip()
 
-try:
-    return json.loads(text)
-except json.JSONDecodeError:
-    # Retry once with stricter instructions
-    resp2 = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[
-            {
-                "role": "system",
-                "content": (
-                    "Return ONLY valid JSON (no markdown, no extra text). "
-                    "Keys: msg_0, msg_24h, msg_72h. Values: SMS under 120 characters."
-                ),
-            },
-            {
-                "role": "user",
-                "content": f"Name: {name}\nService: {service}\nInterest: {interest}",
-            },
-        ],
-    )
-    text2 = resp2.choices[0].message.content.strip()
-    return json.loads(text2)
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        resp2 = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "Return ONLY valid JSON (no markdown, no extra text). "
+                        "Keys: msg_0, msg_24h, msg_72h. Values under 120 characters."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": f"Name: {name}\nService: {service}\nInterest: {interest}",
+                },
+            ],
+        )
+        text2 = resp2.choices[0].message.content.strip()
+        return json.loads(text2)
 
 def is_valid_e164(phone: str) -> bool:
     # E.164 format: + followed by 10–15 digits
