@@ -87,29 +87,31 @@ def send_sms(to_number: str, body: str) -> None:
 def generate_followup_sequence(name: str, service: str, interest: str) -> dict:
     resp = client.chat.completions.create(
         model="gpt-4o-mini",
-        messages=[
-            {
-                "role": "system",
-                "content": (
-                    "Return ONLY valid JSON (no markdown, no extra text). "
-                    "Keys: msg_0, msg_24h, msg_72h. "
-                    "Each value must be under 120 characters. "
-                    "Tone: experienced storm roofing contractor texting a homeowner. "
-                    "Be direct and specific. No fluff. No 'just checking in'. "
-                    "Use short sentences. Avoid phrases like 'we need to', 'it's crucial', or 'just checking in'."
-                    "No marketing phrases. No emojis. No exclamation points. "
-                    "Mention storm damage naturally when relevant. "
-                    "Subtle urgency (adjusters booking, small damage worsens). "
-                    "Always end with a simple scheduling question with two options "
-                    "(example: 'Today or tomorrow?' or 'Morning or afternoon?'). "
-                    "Sound like a real contractor, not customer service."
-                ),
-            },
-            {
-                "role": "user",
-                "content": f"Name: {name}\nService: {service}\nInterest: {interest}",
-            },
-        ],
+messages=[
+    {
+        "role": "system",
+        "content": (
+            "Return ONLY valid JSON (no markdown, no extra text). "
+            "Keys: msg_0, msg_24h, msg_72h. "
+            "Each value must be under 120 characters. "
+            "Tone: experienced storm roofing contractor texting a homeowner. "
+            "Be direct and specific. Short sentences. "
+            "No fluff. No 'just checking in'. "
+            "No marketing phrases. No emojis. No exclamation points. "
+            "Assume NO inspection has occurred yet. "
+            "Never imply the roof was inspected, reviewed, or assessed already. "
+            "Mention storm damage naturally when relevant. "
+            "Subtle urgency (adjusters booking, small damage worsens). "
+            "Always end with a simple scheduling question with two options "
+            "(example: 'Today or tomorrow?' or 'Morning or afternoon?'). "
+            "Sound like a real contractor."
+        ),
+    },
+    {
+        "role": "user",
+        "content": f"Name: {name}\nService: {service}\nInterest: {interest}",
+    },
+],
     )
 
     text = resp.choices[0].message.content.strip()
