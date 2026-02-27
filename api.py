@@ -94,15 +94,16 @@ def generate_followup_sequence(name: str, service: str, interest: str) -> dict:
         "Return ONLY valid JSON (no markdown, no extra text). "
         "Keys: msg_0, msg_24h, msg_72h. "
         "Each value must be under 120 characters. "
-        "Tone: experienced local storm roofing contractor texting a homeowner. "
-        "Calm, confident, helpful, not salesy. No emojis, no exclamation points. "
-        "Do NOT use marketing lines like 'time's ticking' or 'peace of mind'. "
-        "Do NOT say 'free' unless explicitly told. "
-        "Offer a roof inspection/roof check and insurance help when relevant. "
-        "End with an easy-to-answer question (two options like 'morning or afternoon?')."
+        "Tone: experienced storm roofing contractor texting a homeowner. "
+        "Be direct and specific. No fluff. No 'just checking in'. "
+        "No marketing phrases. No emojis. No exclamation points. "
+        "Mention storm damage naturally when relevant. "
+        "Subtle urgency (adjusters booking, small damage worsens). "
+        "Always end with a simple scheduling question with two options "
+        "(example: 'Today or tomorrow?' or 'Morning or afternoon?'). "
+        "Sound like a real contractor, not customer service."
     ),
 },
-        ],
     )
 
     text = resp.choices[0].message.content.strip()
