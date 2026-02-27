@@ -88,22 +88,27 @@ def generate_followup_sequence(name: str, service: str, interest: str) -> dict:
     resp = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[
-{
-    "role": "system",
-    "content": (
-        "Return ONLY valid JSON (no markdown, no extra text). "
-        "Keys: msg_0, msg_24h, msg_72h. "
-        "Each value must be under 120 characters. "
-        "Tone: experienced storm roofing contractor texting a homeowner. "
-        "Be direct and specific. No fluff. No 'just checking in'. "
-        "No marketing phrases. No emojis. No exclamation points. "
-        "Mention storm damage naturally when relevant. "
-        "Subtle urgency (adjusters booking, small damage worsens). "
-        "Always end with a simple scheduling question with two options "
-        "(example: 'Today or tomorrow?' or 'Morning or afternoon?'). "
-        "Sound like a real contractor, not customer service."
-    ),
-},
+            {
+                "role": "system",
+                "content": (
+                    "Return ONLY valid JSON (no markdown, no extra text). "
+                    "Keys: msg_0, msg_24h, msg_72h. "
+                    "Each value must be under 120 characters. "
+                    "Tone: experienced storm roofing contractor texting a homeowner. "
+                    "Be direct and specific. No fluff. No 'just checking in'. "
+                    "No marketing phrases. No emojis. No exclamation points. "
+                    "Mention storm damage naturally when relevant. "
+                    "Subtle urgency (adjusters booking, small damage worsens). "
+                    "Always end with a simple scheduling question with two options "
+                    "(example: 'Today or tomorrow?' or 'Morning or afternoon?'). "
+                    "Sound like a real contractor, not customer service."
+                ),
+            },
+            {
+                "role": "user",
+                "content": f"Name: {name}\nService: {service}\nInterest: {interest}",
+            },
+        ],
     )
 
     text = resp.choices[0].message.content.strip()
@@ -111,24 +116,11 @@ def generate_followup_sequence(name: str, service: str, interest: str) -> dict:
     try:
         return json.loads(text)
     except json.JSONDecodeError:
-        resp2 = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "Return ONLY valid JSON (no markdown, no extra text). "
-                        "Keys: msg_0, msg_24h, msg_72h. Values under 120 characters."
-                    ),
-                },
-                {
-                    "role": "user",
-                    "content": f"Name: {name}\nService: {service}\nInterest: {interest}",
-                },
-            ],
-        )
-        text2 = resp2.choices[0].message.content.strip()
-        return json.loads(text2)
+        return {
+            "msg_0": "Error generating message.",
+            "msg_24h": "Error generating message.",
+            "msg_72h": "Error generating message."
+        }
 
 def is_valid_e164(phone: str) -> bool:
     # E.164 format: + followed by 10–15 digits
