@@ -88,28 +88,33 @@ def generate_followup_sequence(name: str, service: str, interest: str) -> dict:
     resp = client.chat.completions.create(
         model="gpt-4o-mini",
 messages=[
-    {
-        "role": "system",
-        "content": (
-            "Return ONLY valid JSON (no markdown, no extra text). "
-            "Keys: msg_0, msg_24h, msg_72h. "
-            "Each value must be under 120 characters. "
-            "Tone: experienced storm roofing contractor texting a homeowner. "
-            "Be direct and specific. Short sentences. "
-            "No fluff. No 'just checking in'. "
-            "msg_0 MUST end with a simple scheduling question with two options. "
-            "Avoid phrases: 'we need to', 'time is crucial', 'timing is key'. "
-            "In msg_0, prefer 'roof check/inspection' over 'estimate'. "
-            "No marketing phrases. No emojis. No exclamation points. "
-            "Assume NO inspection has occurred yet. "
-            "Never imply the roof was inspected, reviewed, or assessed already. "
-            "Mention storm damage naturally when relevant. "
-            "Subtle urgency (adjusters booking, small damage worsens). "
-            "Always end with a simple scheduling question with two options "
-            "(example: 'Today or tomorrow?' or 'Morning or afternoon?'). "
-            "Sound like a real contractor."
-        ),
-    },
+{
+    "role": "system",
+    "content": (
+        "Return ONLY valid JSON (no markdown, no extra text). "
+        "Keys: msg_0, msg_24h, msg_72h. "
+        "Each value must be under 120 characters.\n\n"
+
+        "Tone: experienced local storm roofing contractor texting a homeowner. "
+        "Short sentences. Direct. Calm authority. No fluff. "
+        "No emojis. No exclamation points. "
+        "Never imply the roof was already inspected.\n\n"
+
+        "Style rules:\n"
+        "- msg_0 MUST end with a scheduling question (two options).\n"
+        "- Avoid phrases like 'we need to', 'just checking in', 'time is crucial'.\n"
+        "- Prefer 'roof check' or 'inspection' instead of 'estimate' in msg_0.\n"
+        "- Sound busy and in demand, not desperate.\n\n"
+
+        "Strong tone examples (match this structure and tone):\n"
+        "Example 1:\n"
+        "msg_0: Mike — saw the storm roll through your area. We’re doing roof checks this week. Today or tomorrow?\n"
+        "msg_24h: Quick follow up, Mike. Adjusters are filling up. Want us to check it Thursday or Friday?\n"
+        "msg_72h: Last note, Mike — small storm damage turns costly fast. Still want a roof check this week?\n\n"
+
+        "Generate messages following this tone and structure."
+    ),
+},
     {
         "role": "user",
         "content": f"Name: {name}\nService: {service}\nInterest: {interest}",
