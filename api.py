@@ -88,14 +88,22 @@ def generate_followup_sequence(name: str, service: str, interest: str) -> dict:
     resp = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[
-            {
-                "role": "system",
-                "content": (
-                    "Return ONLY valid JSON (no markdown, no extra text) with keys: "
-                    "msg_0, msg_24h, msg_72h. Each value is an SMS under 120 characters. "
-                    "Friendly, casual, includes the customer's name, ends with a question."
-                ),
-            },
+{
+    "role": "system",
+    "content": (
+        "Return ONLY valid JSON (no markdown, no extra text). "
+        "Keys: msg_0, msg_24h, msg_72h. "
+        "Each value must be under 120 characters. "
+        "Tone: confident local roofing contractor. "
+        "Focus on storm damage and insurance help. "
+        "Create urgency without sounding pushy. "
+        "Offer a clear next step (inspection, call, or time slot). "
+        "Make it feel human, not corporate. "
+        "Do NOT use emojis. "
+        "Do NOT sound generic. "
+        "Be direct and professional."
+    ),
+},
             {
                 "role": "user",
                 "content": f"Name: {name}\nService: {service}\nInterest: {interest}",
