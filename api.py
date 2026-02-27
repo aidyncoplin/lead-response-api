@@ -96,6 +96,7 @@ def generate_followup_sequence(name: str, service: str, interest: str) -> dict:
                     "Each value must be under 120 characters. "
                     "Tone: experienced storm roofing contractor texting a homeowner. "
                     "Be direct and specific. No fluff. No 'just checking in'. "
+                    "Use short sentences. Avoid phrases like 'we need to', 'it's crucial', or 'just checking in'."
                     "No marketing phrases. No emojis. No exclamation points. "
                     "Mention storm damage naturally when relevant. "
                     "Subtle urgency (adjusters booking, small damage worsens). "
