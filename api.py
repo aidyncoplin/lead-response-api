@@ -11,6 +11,7 @@ from email.message import EmailMessage
 
 from dotenv import load_dotenv
 from openai import OpenAI
+from fastapi.responses import HTMLResponse
 from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel
 from twilio.rest import Client as TwilioClient
@@ -38,23 +39,6 @@ class Lead(BaseModel):
 # -------------------------
 # Helper Functions
 # -------------------------
-
-def generate_followup(name: str, service: str, interest: str) -> str:
-    resp = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[
-            {
-                "role": "system",
-                "content": "You are a professional sales assistant. Write a short, friendly SMS under 180 characters. Include the customer's name. Be conversational, not corporate. End with a question that encourages a reply."
-            },
-            {
-                "role": "user",
-                "content": f"Name: {name}\nService: {service}\nInterest: {interest}\nWrite a 2-sentence text message follow-up.",
-            },
-        ],
-    )
-    return resp.choices[0].message.content
-
 
 def save_to_csv(name: str, service: str, interest: str, message: str) -> None:
     file_exists = os.path.isfile("leads.csv")
@@ -119,8 +103,30 @@ def generate_followup_sequence(name: str, service: str, interest: str) -> dict:
         ],
     )
 
-    text = resp.choices[0].message.content.strip()
+text = resp.choices[0].message.content.strip()
+
+try:
     return json.loads(text)
+except json.JSONDecodeError:
+    # Retry once with stricter instructions
+    resp2 = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {
+                "role": "system",
+                "content": (
+                    "Return ONLY valid JSON (no markdown, no extra text). "
+                    "Keys: msg_0, msg_24h, msg_72h. Values: SMS under 120 characters."
+                ),
+            },
+            {
+                "role": "user",
+                "content": f"Name: {name}\nService: {service}\nInterest: {interest}",
+            },
+        ],
+    )
+    text2 = resp2.choices[0].message.content.strip()
+    return json.loads(text2)
 
 def is_valid_e164(phone: str) -> bool:
     # E.164 format: + followed by 10–15 digits
@@ -155,7 +161,113 @@ def demo():
         "sequence": seq,
         "immediate_sms_preview": seq["msg_0"],
     }
-    
+
+@app.post("/demo-generate")
+def demo_generate(lead: Lead):
+    # No auth, no SMS, no email. Demo only.
+    seq = generate_followup_sequence(lead.name, lead.service, lead.interest)
+    return {"sequence": seq}
+
+@app.get("/demo-ui", response_class=HTMLResponse)
+def demo_ui():
+    return """
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Storm Lead Follow-Up Demo</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 760px; margin: 40px auto; padding: 0 16px; }
+    h1 { margin-bottom: 8px; }
+    .sub { color: #444; margin-bottom: 24px; }
+    label { display: block; margin-top: 12px; font-weight: 600; }
+    input { width: 100%; padding: 10px; margin-top: 6px; font-size: 16px; }
+    button { margin-top: 16px; padding: 12px 16px; font-size: 16px; cursor: pointer; }
+    .box { margin-top: 18px; padding: 12px; border: 1px solid #ddd; border-radius: 8px; background: #fafafa; }
+    .title { font-weight: 700; margin-bottom: 6px; }
+    pre { white-space: pre-wrap; word-wrap: break-word; margin: 0; font-size: 15px; }
+    .err { color: #b00020; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <h1>Storm Lead Follow-Up Demo</h1>
+  <div class="sub">Type a lead. Click Generate. See the exact texts your system would send.</div>
+
+  <label>Name</label>
+  <input id="name" value="Mike" />
+
+  <label>Service</label>
+  <input id="service" value="Roofing estimate" />
+
+  <label>Interest</label>
+  <input id="interest" value="Storm damage" />
+
+  <button id="btn">Generate Messages</button>
+
+  <div id="status" class="box" style="display:none;"></div>
+
+  <div id="out" style="display:none;">
+    <div class="box"><div class="title">Immediate (msg_0)</div><pre id="m0"></pre></div>
+    <div class="box"><div class="title">+24 hours (msg_24h)</div><pre id="m24"></pre></div>
+    <div class="box"><div class="title">+72 hours (msg_72h)</div><pre id="m72"></pre></div>
+  </div>
+
+<script>
+const btn = document.getElementById("btn");
+const statusBox = document.getElementById("status");
+const out = document.getElementById("out");
+
+function showStatus(text, isError=false) {
+  statusBox.style.display = "block";
+  statusBox.innerHTML = isError ? `<div class="err">${text}</div>` : text;
+}
+
+btn.addEventListener("click", async () => {
+  const name = document.getElementById("name").value.trim();
+  const service = document.getElementById("service").value.trim();
+  const interest = document.getElementById("interest").value.trim();
+
+  showStatus("Generating…");
+  out.style.display = "none";
+
+  try {
+    const res = await fetch("/demo-generate", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({
+        name,
+        service,
+        interest,
+        notify_email: "demo@example.com",
+        lead_phone: "+10000000000"
+      })
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      showStatus("Error: " + (data.detail || JSON.stringify(data)), true);
+      return;
+    }
+
+    const seq = data.sequence || {};
+    document.getElementById("m0").textContent = seq.msg_0 || "(missing)";
+    document.getElementById("m24").textContent = seq.msg_24h || "(missing)";
+    document.getElementById("m72").textContent = seq.msg_72h || "(missing)";
+
+    statusBox.style.display = "none";
+    out.style.display = "block";
+  } catch (e) {
+    showStatus("Error: " + e.message, true);
+  }
+});
+</script>
+
+</body>
+</html>
+"""
+
 @app.post("/twilio/voice")
 async def twilio_voice(request: Request):
     form = await request.form()
