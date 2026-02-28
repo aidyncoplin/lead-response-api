@@ -473,10 +473,6 @@ def generate_lead_response(
     if x_api_key != api_secret:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
-lead_id = str(uuid.uuid4())
-created_dt = datetime.datetime.utcnow()
-timestamp = created_dt.isoformat()
-
     if not lead.name.strip() or not lead.service.strip() or not lead.interest.strip():
         raise HTTPException(status_code=422, detail="name/service/interest cannot be empty")
 
@@ -486,37 +482,14 @@ timestamp = created_dt.isoformat()
     if not is_valid_e164(lead.lead_phone):
         raise HTTPException(status_code=422, detail="lead_phone must be in E.164 format like +18015551234")
 
-    # 1) Generate AI message
+    # Create lead ID and timestamp
+    lead_id = str(uuid.uuid4())
+    created_dt = datetime.datetime.utcnow()
+    timestamp = created_dt.isoformat()
+
+    # Generate AI messages
     seq = generate_followup_sequence(lead.name, lead.service, lead.interest)
     msg = seq["msg_0"]
-
-    # 2) Save it
-save_lead_to_db(
-    lead_id=lead_id,
-    created_utc=timestamp,
-    name=lead.name,
-    service=lead.service,
-    interest=lead.interest,
-    lead_phone=lead.lead_phone,
-    notify_email=lead.notify_email,
-    seq=seq,
-    sms_target=sms_to,
-    sms_mode=sms_mode
-)
-
-    # 3) Send email
-    try:
-        send_email(
-            to_email=lead.notify_email,
-            subject=f"New lead follow-up generated for {lead.name}",
-            body=(
-            f"Immediate:\n{seq['msg_0']}\n\n"
-            f"+24h:\n{seq['msg_24h']}\n\n"
-            f"+72h:\n{seq['msg_72h']}\n"
-        ),
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Email send failed: {type(e).__name__}: {e}")
 
     # SMS MODE: "test" sends to TEST_SMS_TO, "live" sends to the lead's phone
     sms_mode = (os.getenv("SMS_MODE") or "test").lower()
@@ -529,13 +502,40 @@ save_lead_to_db(
     if not sms_to:
         raise HTTPException(status_code=500, detail="SMS target missing (check SMS_MODE/TEST_SMS_TO/lead_phone)")
 
+    # Save lead to database
+    save_lead_to_db(
+        lead_id=lead_id,
+        created_utc=timestamp,
+        name=lead.name,
+        service=lead.service,
+        interest=lead.interest,
+        lead_phone=lead.lead_phone,
+        notify_email=lead.notify_email,
+        seq=seq,
+        sms_target=sms_to,
+        sms_mode=sms_mode
+    )
+
+    # Send email
+    try:
+        send_email(
+            to_email=lead.notify_email,
+            subject=f"New lead follow-up generated for {lead.name}",
+            body=(
+                f"Immediate:\n{seq['msg_0']}\n\n"
+                f"+24h:\n{seq['msg_24h']}\n\n"
+                f"+72h:\n{seq['msg_72h']}\n"
+            ),
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Email send failed: {type(e).__name__}: {e}")
+
+    # Send immediate SMS + enqueue followups
     try:
         send_sms(sms_to, msg)
         enqueue_followups(lead_id=lead_id, base_time_utc=created_dt, to_number=sms_to, seq=seq)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"SMS send failed: {type(e).__name__}: {e}")
-        
-    print(f"[{timestamp}] Request {request_id} | Lead: {lead.name} | SMS_MODE: {sms_mode}")
 
     return {
         "lead_id": lead_id,
