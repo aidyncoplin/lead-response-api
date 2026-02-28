@@ -19,7 +19,7 @@ from twilio.rest import Client as TwilioClient
 load_dotenv()
 
 app = FastAPI(title="Lead Response API")
-init_db()
+
 
 # OpenAI client
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -83,6 +83,8 @@ def init_db():
     """)
     con.commit()
     con.close()
+
+init_db()
 
 def require_demo_key(x_demo_key: str):
     demo_key = os.getenv("DEMO_KEY") or ""
