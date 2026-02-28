@@ -19,6 +19,7 @@ from twilio.rest import Client as TwilioClient
 load_dotenv()
 
 app = FastAPI(title="Lead Response API")
+init_db()
 
 # OpenAI client
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -40,17 +41,101 @@ class Lead(BaseModel):
 # Helper Functions
 # -------------------------
 
-def save_to_csv(name: str, service: str, interest: str, message: str) -> None:
-    file_exists = os.path.isfile("leads.csv")
+import sqlite3
 
-    with open("leads.csv", mode="a", newline="", encoding="utf-8") as f:
-        writer = csv.writer(f)
+DB_PATH = os.getenv("DB_PATH") or "app.db"
 
-        if not file_exists:
-            writer.writerow(["Name", "Service", "Interest", "AI_Response"])
+def db_conn():
+    # check_same_thread=False is fine for simple FastAPI usage
+    return sqlite3.connect(DB_PATH, check_same_thread=False)
 
-        writer.writerow([name, service, interest, message])
+def init_db():
+    con = db_conn()
+    cur = con.cursor()
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS leads (
+            id TEXT PRIMARY KEY,
+            created_utc TEXT NOT NULL,
+            name TEXT NOT NULL,
+            service TEXT NOT NULL,
+            interest TEXT NOT NULL,
+            lead_phone TEXT NOT NULL,
+            notify_email TEXT NOT NULL,
+            msg_0 TEXT NOT NULL,
+            msg_24h TEXT NOT NULL,
+            msg_72h TEXT NOT NULL,
+            sms_target TEXT NOT NULL,
+            sms_mode TEXT NOT NULL
+        )
+    """)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS followup_jobs (
+            id TEXT PRIMARY KEY,
+            lead_id TEXT NOT NULL,
+            run_at_utc TEXT NOT NULL,
+            to_number TEXT NOT NULL,
+            body TEXT NOT NULL,
+            status TEXT NOT NULL,   -- pending|sent|failed
+            attempts INTEGER NOT NULL DEFAULT 0,
+            last_error TEXT,
+            created_utc TEXT NOT NULL
+        )
+    """)
+    con.commit()
+    con.close()
 
+def require_demo_key(x_demo_key: str):
+    demo_key = os.getenv("DEMO_KEY") or ""
+    if demo_key and x_demo_key != demo_key:
+        raise HTTPException(status_code=401, detail="Unauthorized demo")
+
+def save_lead_to_db(
+    lead_id: str,
+    created_utc: str,
+    name: str,
+    service: str,
+    interest: str,
+    lead_phone: str,
+    notify_email: str,
+    seq: dict,
+    sms_target: str,
+    sms_mode: str
+) -> None:
+    con = db_conn()
+    cur = con.cursor()
+    cur.execute("""
+        INSERT INTO leads
+        (id, created_utc, name, service, interest, lead_phone, notify_email,
+         msg_0, msg_24h, msg_72h, sms_target, sms_mode)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        lead_id, created_utc, name, service, interest, lead_phone, notify_email,
+        seq["msg_0"], seq["msg_24h"], seq["msg_72h"], sms_target, sms_mode
+    ))
+    con.commit()
+    con.close()
+
+def enqueue_followups(lead_id: str, base_time_utc: datetime.datetime, to_number: str, seq: dict) -> None:
+    con = db_conn()
+    cur = con.cursor()
+
+    jobs = [
+        ("24h", base_time_utc + datetime.timedelta(minutes=1), seq["msg_24h"]),
+        ("72h", base_time_utc + datetime.timedelta(minutes=2), seq["msg_72h"]),
+    ]
+
+    now_utc = datetime.datetime.utcnow().isoformat()
+
+    for label, run_at, body in jobs:
+        job_id = str(uuid.uuid4())
+        cur.execute("""
+            INSERT INTO followup_jobs
+            (id, lead_id, run_at_utc, to_number, body, status, attempts, last_error, created_utc)
+            VALUES (?, ?, ?, ?, ?, 'pending', 0, NULL, ?)
+        """, (job_id, lead_id, run_at.isoformat(), to_number, body, now_utc))
+
+    con.commit()
+    con.close()
 
 def send_email(to_email: str, subject: str, body: str) -> None:
     email_from = os.getenv("EMAIL_FROM")
@@ -151,7 +236,8 @@ def root():
     return {"status": "ok", "message": "Lead Response API is running"}
 
 @app.get("/demo")
-def demo():
+def demo(x_demo_key: str = Header(default="", alias="X-DEMO-KEY")):
+    require_demo_key(x_demo_key)
     # Fake lead data for demos
     name = "Mike"
     service = "Roofing estimate"
@@ -166,6 +252,47 @@ def demo():
         "sequence": seq,
         "immediate_sms_preview": seq["msg_0"],
     }
+
+@app.post("/dispatch-followups")
+def dispatch_followups(x_dispatch_key: str = Header(default="", alias="X-DISPATCH-KEY")):
+    secret = os.getenv("DISPATCH_SECRET") or ""
+    if not secret or x_dispatch_key != secret:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    now = datetime.datetime.utcnow().isoformat()
+
+    con = db_conn()
+    cur = con.cursor()
+
+    cur.execute("""
+        SELECT id, to_number, body, attempts
+        FROM followup_jobs
+        WHERE status='pending' AND run_at_utc <= ?
+        ORDER BY run_at_utc ASC
+        LIMIT 25
+    """, (now,))
+    rows = cur.fetchall()
+
+    sent = 0
+    failed = 0
+
+    for job_id, to_number, body, attempts in rows:
+        try:
+            send_sms(to_number, body)
+            cur.execute("UPDATE followup_jobs SET status='sent' WHERE id=?", (job_id,))
+            sent += 1
+        except Exception as e:
+            failed += 1
+            cur.execute("""
+                UPDATE followup_jobs
+                SET status='failed', attempts=?, last_error=?
+                WHERE id=?
+            """, (attempts + 1, f"{type(e).__name__}: {e}", job_id))
+
+    con.commit()
+    con.close()
+
+    return {"now_utc": now, "sent": sent, "failed": failed, "checked": len(rows)}
 
 @app.post("/demo-generate")
 def demo_generate(lead: Lead):
@@ -346,8 +473,9 @@ def generate_lead_response(
     if x_api_key != api_secret:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
-    request_id = str(uuid.uuid4())
-    timestamp = datetime.datetime.utcnow().isoformat()
+lead_id = str(uuid.uuid4())
+created_dt = datetime.datetime.utcnow()
+timestamp = created_dt.isoformat()
 
     if not lead.name.strip() or not lead.service.strip() or not lead.interest.strip():
         raise HTTPException(status_code=422, detail="name/service/interest cannot be empty")
@@ -363,7 +491,18 @@ def generate_lead_response(
     msg = seq["msg_0"]
 
     # 2) Save it
-    save_to_csv(lead.name, lead.service, lead.interest, msg)
+save_lead_to_db(
+    lead_id=lead_id,
+    created_utc=timestamp,
+    name=lead.name,
+    service=lead.service,
+    interest=lead.interest,
+    lead_phone=lead.lead_phone,
+    notify_email=lead.notify_email,
+    seq=seq,
+    sms_target=sms_to,
+    sms_mode=sms_mode
+)
 
     # 3) Send email
     try:
@@ -392,13 +531,14 @@ def generate_lead_response(
 
     try:
         send_sms(sms_to, msg)
+        enqueue_followups(lead_id=lead_id, base_time_utc=created_dt, to_number=sms_to, seq=seq)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"SMS send failed: {type(e).__name__}: {e}")
         
     print(f"[{timestamp}] Request {request_id} | Lead: {lead.name} | SMS_MODE: {sms_mode}")
 
     return {
-        "request_id": request_id,
+        "lead_id": lead_id,
         "timestamp_utc": timestamp,
         "sequence": seq,
         "emailed_to": lead.notify_email,
