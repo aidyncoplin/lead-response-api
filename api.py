@@ -122,8 +122,8 @@ def enqueue_followups(lead_id: str, base_time_utc: datetime.datetime, to_number:
     cur = con.cursor()
 
     jobs = [
-        ("24h", base_time_utc + datetime.timedelta(minutes=1), seq["msg_24h"]),
-        ("72h", base_time_utc + datetime.timedelta(minutes=2), seq["msg_72h"]),
+        ("24h", base_time_utc + datetime.timedelta(hours=24), seq["msg_24h"]),
+        ("72h", base_time_utc + datetime.timedelta(hours=72), seq["msg_72h"]),
     ]
 
     now_utc = datetime.datetime.utcnow().isoformat()
