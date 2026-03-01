@@ -386,6 +386,15 @@ def demo_generate(lead: Lead):
     seq = generate_followup_sequence(lead.name, lead.service, lead.interest)
     return {"sequence": seq}
 
+@app.get("/debug-leads")
+def debug_leads():
+    con = db_conn()
+    cur = con.cursor()
+    cur.execute("SELECT id, name, lead_phone, responded FROM leads ORDER BY rowid DESC LIMIT 10")
+    rows = cur.fetchall()
+    con.close()
+    return {"leads": rows}
+
 @app.get("/demo-ui", response_class=HTMLResponse)
 def demo_ui():
     return """
