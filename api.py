@@ -66,6 +66,7 @@ def init_db():
             msg_72h TEXT NOT NULL,
             sms_target TEXT NOT NULL,
             sms_mode TEXT NOT NULL
+            responded INTEGER NOT NULL DEFAULT 0
         )
     """)
     cur.execute("""
@@ -258,6 +259,15 @@ def demo():
         },
         "impact": "If even 1 missed storm call converts, that can mean $10,000–$25,000 recovered revenue."
     }
+
+@app.get("/migrate-add-responded")
+def migrate():
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("ALTER TABLE leads ADD COLUMN responded INTEGER NOT NULL DEFAULT 0")
+    conn.commit()
+    conn.close()
+    return {"status": "column added"}
 
 @app.post("/dispatch-followups")
 def dispatch_followups(x_dispatch_key: str = Header(default="", alias="X-DISPATCH-KEY")):
