@@ -52,23 +52,24 @@ def db_conn():
 def init_db():
     con = db_conn()
     cur = con.cursor()
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS leads (
-            id TEXT PRIMARY KEY,
-            created_utc TEXT NOT NULL,
-            name TEXT NOT NULL,
-            service TEXT NOT NULL,
-            interest TEXT NOT NULL,
-            lead_phone TEXT NOT NULL,
-            notify_email TEXT NOT NULL,
-            msg_0 TEXT NOT NULL,
-            msg_24h TEXT NOT NULL,
-            msg_72h TEXT NOT NULL,
-            sms_target TEXT NOT NULL,
-            sms_mode TEXT NOT NULL
-            responded INTEGER NOT NULL DEFAULT 0
-        )
-    """)
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS leads (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT,
+    service TEXT,
+    interest TEXT,
+    phone TEXT,
+    msg_0 TEXT,
+    msg_24h TEXT,
+    msg_72h TEXT,
+    sent_0 INTEGER DEFAULT 0,
+    sent_24 INTEGER DEFAULT 0,
+    sent_72 INTEGER DEFAULT 0,
+    responded INTEGER DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+)
+""")
+
     cur.execute("""
         CREATE TABLE IF NOT EXISTS followup_jobs (
             id TEXT PRIMARY KEY,
@@ -260,14 +261,6 @@ def demo():
         "impact": "If even 1 missed storm call converts, that can mean $10,000–$25,000 recovered revenue."
     }
 
-@app.get("/migrate-add-responded")
-def migrate():
-    conn = get_db_connection()
-    cur = conn.cursor()
-    cur.execute("ALTER TABLE leads ADD COLUMN responded INTEGER NOT NULL DEFAULT 0")
-    conn.commit()
-    conn.close()
-    return {"status": "column added"}
 
 @app.post("/dispatch-followups")
 def dispatch_followups(x_dispatch_key: str = Header(default="", alias="X-DISPATCH-KEY")):
