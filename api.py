@@ -238,21 +238,25 @@ def root():
     return {"status": "ok", "message": "Lead Response API is running"}
 
 @app.get("/demo")
-def demo(x_demo_key: str = Header(default="", alias="X-DEMO-KEY")):
-    require_demo_key(x_demo_key)
-    # Fake lead data for demos
-    name = "Mike"
-    service = "Roofing estimate"
-    interest = "Storm damage"
-
-    seq = generate_followup_sequence(name, service, interest)
-
-    # Also show what would be sent immediately
+def demo():
     return {
-        "demo": True,
-        "lead": {"name": name, "service": service, "interest": interest},
-        "sequence": seq,
-        "immediate_sms_preview": seq["msg_0"],
+        "headline": "When You Miss a Storm Call, This Is What The Homeowner Sees",
+        "problem": "During hail or storm spikes, call volume overwhelms staff. Some calls go unanswered.",
+        "solution": "Instead of voicemail, the homeowner instantly receives:",
+        "lead_example": {
+            "name": "Mike",
+            "service": "Roofing estimate",
+            "interest": "Storm damage"
+        },
+        "sequence_preview": {
+            "Immediate (sent within seconds of missed call)": 
+                "Mike — saw the storm roll through your area. We’re doing roof checks this week. Today or tomorrow?",
+            "24 Hours Later (if no reply)": 
+                "Quick follow up, Mike. Adjusters are filling up. Want us to check it Thursday or Friday?",
+            "72 Hours Later (final touch)": 
+                "Last note, Mike — small storm damage turns costly fast. Still want a roof check this week?"
+        },
+        "impact": "If even 1 missed storm call converts, that can mean $10,000–$25,000 recovered revenue."
     }
 
 @app.post("/dispatch-followups")
