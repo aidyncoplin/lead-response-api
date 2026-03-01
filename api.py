@@ -261,6 +261,27 @@ def demo():
         "impact": "If even 1 missed storm call converts, that can mean $10,000–$25,000 recovered revenue."
     }
 
+from fastapi import Request
+
+@app.post("/twilio/sms")
+async def twilio_inbound_sms(request: Request):
+    form = await request.form()
+    from_number = form.get("From")
+    body = form.get("Body")
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        UPDATE leads
+        SET responded = 1
+        WHERE phone = ?
+    """, (from_number,))
+
+    conn.commit()
+    conn.close()
+
+    return {"status": "received"}
 
 @app.post("/dispatch-followups")
 def dispatch_followups(x_dispatch_key: str = Header(default="", alias="X-DISPATCH-KEY")):
