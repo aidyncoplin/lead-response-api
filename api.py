@@ -127,6 +127,48 @@ def is_valid_e164(phone: str) -> bool:
 def is_valid_email(email: str) -> bool:
     return bool(re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email or ""))
 
+def extract_first_name(text: str) -> str:
+    """
+    Pull a likely first name from common reply patterns.
+    Returns "" if none found.
+    """
+    if not text:
+        return ""
+    t = text.strip()
+
+    patterns = [
+        r"\b(?:i'?m|im|i am|this is)\s+([A-Za-z]{2,20})\b",
+        r"\b([A-Za-z]{2,20})\s+(?:here)\b",
+        r"^([A-Za-z]{2,20})\b",  # starts with a name
+    ]
+
+    for p in patterns:
+        m = re.search(p, t, flags=re.IGNORECASE)
+        if m:
+            name = m.group(1)
+            # normalize capitalization
+            name = name[:1].upper() + name[1:].lower()
+            # reject common non-names
+            if name.lower() in {"yes", "yeah", "yep", "ok", "okay", "call", "sure"}:
+                return ""
+            return name
+    return ""
+
+def update_lead_name_by_phone(phone: str, first_name: str) -> None:
+    if not first_name:
+        return
+    con = db_conn()
+    cur = con.cursor()
+    # Only update if the saved name looks like unknown/blank
+    cur.execute("""
+        UPDATE leads
+        SET name = ?
+        WHERE lead_phone = ?
+          AND (name IS NULL OR name='' OR name='(unknown)')
+    """, (first_name, phone))
+    con.commit()
+    con.close()
+
 def require_api_key(x_api_key: str):
     if not API_SECRET:
         raise HTTPException(status_code=500, detail="Server misconfigured: API_SECRET missing")
